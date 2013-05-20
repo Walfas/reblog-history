@@ -1,0 +1,175 @@
+<html>
+<head>
+	<title>Reblog History</title>
+	
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+	<script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+	<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" type="text/css">
+	<style type="text/css"> 
+	.centered {
+		display: block;
+		margin-left: auto;
+		margin-right: auto;
+		width: 500px;
+	}
+	input[type=text] {
+		color: white;
+		background-color: rgba(0,0,0,.10);
+		padding: 8px;
+		margin-bottom: 12px;
+		border-radius: 28px;
+		border: none;
+		outline: 0;
+		outline-style: none;
+		outline-width: 0;
+		position: relative;
+		outline: none;
+		width: 400px;
+	}
+	ul {
+		padding: 0;
+		list-style-type: none;
+	}
+	li {
+		padding: 6px 5px 5px 5px;
+		background-color: #f0f1f3;
+		border-left: 1px solid #dde0e5;
+		border-right: 1px solid #dde0e5;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.80);
+		text-shadow: 0 1px 1px rgba(255,255,255,1);
+		font-size: 13px;
+		color: #999da2;
+	}
+	body {
+		font-family: "Helvetica Neue",Helvetica,"Lucida Grande",Arial,sans-serif;
+		background-image: -ms-linear-gradient(top, #3C5B78 0%, #2B4661 );
+		background-image: -moz-linear-gradient(top, #3C5B78 0%, #2B4661 100%);
+		background-image: -o-linear-gradient(top, #3C5B78 0%, #2B4661 100%);
+		background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #3C5B78), color-stop(1, #2B4661));
+		background-image: -webkit-linear-gradient(top, #3C5B78 0%, #2B4661 100%);
+		background-image: linear-gradient(to bottom, #3C5B78 0%, #2B4661 100%);
+		height: 100%;
+		margin: 0;
+		background-repeat: no-repeat;
+		background-attachment: fixed;
+	}
+	#content {
+		background: white;
+		padding: 6px;
+	}
+	li a {
+		color: #7c8187;
+		text-decoration: none;
+	}
+	</style>
+	
+</head>
+<body>
+<div class="centered">
+<input type="text" id="url" name="url" placeholder="URL to Tumblr post">
+<button id="go">Go</button>
+</div>
+<div id="content" class="centered">
+<ul id="list">
+<li>Enter a URL above!</li>
+</ul>
+</div>
+
+<script type="text/javascript" charset="utf-8">
+$(function() {
+
+var url = $("#url");
+var list = $("#list");
+var api_key = "93vVfYr4XJKwqzlIw73kkmVlLMNJftT2aJk7mqFUa5Lp9IPVfY";
+
+var get_api_url = function(blog_url, post_id) {
+	return "http://api.tumblr.com/v2/blog/" + blog_url + "/posts/?" 
+		+ "api_key=" + api_key 
+		+ "&id=" + post_id
+		+ "&reblog_info=true"
+		+ "&callback=?";
+};
+
+var parse_url = function(url) {
+	url = url.replace(/https?:\/\//i, "")
+	var matches = url.match(/(https?:\/\/)?(.+)\/post\/(\d+)/);
+
+	if (!matches)
+		return {};
+	return {
+		base_hostname: matches[2],
+		id: matches[3]
+	};
+};
+
+var add_to_list = function(content) {
+	list.append(
+		$("<li/>", { 
+			html: content,
+			class: ".ui-state-default"
+		})
+	);
+}
+
+var show_data = function(data) {
+	var tags_html = "";
+	for (var i=0; i<data.tags.length; i++) {
+		var tag_url = "http://tumblr.com/tagged/" + data.tags[i];
+		tags_html += "<a href='" + tag_url + "' target='_blank'>#" + data.tags[i] + "</a> "
+	}
+
+	var name = "<a href='" + data.url + "' target='_blank'>" + data.user + "</a> ";
+	var date = "at <i>" + data.date + "</i> ";
+	var tags = tags_html === "" ? "" : ("<br/>" + tags_html);
+	
+	add_to_list(name + date + tags);
+};
+
+var get_reblog_info = function(url) {
+	var info = parse_url(url);
+	if (!info.base_hostname || !info.id) {
+		add_to_list("Invalid URL");
+		return;
+	}
+
+	$.getJSON(
+		get_api_url(info.base_hostname, info.id),
+		function(res) {
+			if (res.meta.status !== 200) {
+				add_to_list("<a href='" + url + "'>" + res.meta.msg + "</a>");
+				return;
+			}
+			var post = res.response.posts[0];
+
+			if (post.hasOwnProperty("reblogged_from_url") && 
+				post.hasOwnProperty("reblogged_from_name"))
+			{
+				show_data({
+					user: post.blog_name,
+					url: post.post_url,
+					date: post.date,
+					tags: post.tags
+				});
+				get_reblog_info(post.reblogged_from_url);
+			}
+		}
+	);
+};
+
+$("#url").keypress(function(event) {
+	if (event.which == 13) { // Enter
+		list.html("");
+		get_reblog_info(url.val());
+	}
+});
+
+$("#go")
+	.click(function(event) {
+		list.html("");
+		get_reblog_info(url.val());
+	});
+});	
+</script>
+</body>
+</html>
